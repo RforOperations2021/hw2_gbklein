@@ -1,0 +1,97 @@
+---
+title: "Business Dynamism in the 50 States"
+output: 
+  flexdashboard::flex_dashboard
+    theme: spacelab
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(ggplot2)
+library(DT)
+library(stringr)
+library(dplyr)
+library(tools)
+library(plotly)
+
+#Load file
+busdyn <- read.csv(file = "BDS_Data_04_18.csv", fileEncoding="UTF-8-BOM")
+
+#Remove Underscores in Column and Row Names
+gsub(x = names(busdyn), pattern = "_", replacement = " ") 
+
+```
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+```{r setup, include=FALSE}
+# User selects which state(s) to graph------------------------------------------
+checkboxGroupInput("state", "State(s)", choices = c("State"),
+                  selected = 2018, inline = TRUE
+                  )
+
+# User selects which year(s) to graph-------------------------------------------
+sliderInput("year", "Year(s)",
+            min = min(busdyn$Year), max = max(busdyn$Year),
+            value = range(busdyn$Year)
+            )
+
+#User selects which metric to graph---------------------------------------------
+radioButtons("metric", "Metric", choices = colnames(busdyn[3:11]), selected = NULL)
+```
+Outputs
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+busdyn_subset <- reactive({
+  req(input$state, input$year, input$metric) #ensure user has chosen what to graph
+  busdyn %>%
+      filter(
+      State == input$state,
+      Year == input$year) +
+    select(input$metric)
+    
+})
+
+gg <- ggplotly(
+  ggplot(busdyn_subset(), aes(x = input$metric, 
+                     y = input$metric +
+                       geom_point(aes(col = input$State)) + 
+  labs(y = input$metric,
+       x = input$metric,
+       title = "The Best Performing States",
+       caption = "Source: U.S. Census Business Dynamics Statistics Survey") +
+  tooltip = (input$State, input$Year)
+
+)))
+plot(gg)
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Value Boxes
+
+```{r}
+valueBox(value = max(busdyn_subset()[,3:ncol(busdyn_subset)]),
+         subtitle = "maximum value of returned data")
+
+valueBox(value = min(busdyn_subset()[,3:ncol(busdyn_subset)]),
+         subtitle = "minimum value of returned data")
+
+valueBox(value = mean(busdyn_subset()[,3:ncol(busdyn_subset)]),
+         subtitle = "mean value of returned data")
+```
+
+### Chart C
+
+```{r}
+
+```
+
