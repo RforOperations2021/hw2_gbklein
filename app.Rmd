@@ -1,10 +1,12 @@
 ---
-title: "Business Dynamism in the 50 States"
+title: "Explore Business Dynamism in the 50 States "
 output: 
   flexdashboard::flex_dashboard
     theme: spacelab
     orientation: rows
+    source_code: embed
     vertical_layout: fill
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -17,10 +19,10 @@ library(dplyr)
 library(tools)
 library(plotly)
 
-#Load file
+# Load file
 busdyn <- read.csv(file = "BDS_Data_04_18.csv", fileEncoding="UTF-8-BOM")
 
-#Remove Underscores in Column and Row Names
+# Remove Underscores in Column and Row Names
 gsub(x = names(busdyn), pattern = "_", replacement = " ") 
 
 ```
@@ -38,8 +40,13 @@ sliderInput("year", "Year(s)",
             value = range(busdyn$Year)
             )
 
-#User selects which metric to graph---------------------------------------------
-radioButtons("metric", "Metric", choices = colnames(busdyn[3:11]), selected = NULL)
+# User selects first metric to graph---------------------------------------------
+radioButtons("metric1", "First Metric", choices = colnames(busdyn[3:11]), selected = NULL)
+
+# User selects second metric to graph---------------------------------------------
+radioButtons("metric2", "Second Metric", choices = colnames(busdyn[3:11]), selected = NULL)
+
+# User can request a data table
 ```
 Outputs
 Column {data-width=650}
@@ -48,28 +55,29 @@ Column {data-width=650}
 ### Chart A
 
 ```{r}
+# Create subset of dataset based on user inputs
 busdyn_subset <- reactive({
   req(input$state, input$year, input$metric) #ensure user has chosen what to graph
   busdyn %>%
       filter(
       State == input$state,
-      Year == input$year) +
-    select(input$metric)
+      Year == input$year) %>%
+    select(State, Year, input$metric1, input$metric2)
     
 })
 
-gg <- ggplotly(
-  ggplot(busdyn_subset(), aes(x = input$metric, 
-                     y = input$metric +
-                       geom_point(aes(col = input$State)) + 
-  labs(y = input$metric,
-       x = input$metric,
-       title = "The Best Performing States",
-       caption = "Source: U.S. Census Business Dynamics Statistics Survey") +
-  tooltip = (input$State, input$Year)
-
-)))
-plot(gg)
+# Create scatterplot of data subset
+renderPlot({
+ggplotly(ggplot(busdyn_subset(), aes(x = input$metric1,
+                            y = input$metric2)) + 
+         geom_point(aes(col = State)) +
+         labs(y = input$metric2,
+              x = input$metric1,
+              title="The Best Performing States",
+              caption="Source: U.S. Census Business Dynamics Statistics Survey"),
+         tooltip=c("x", "y")
+)
+})
 
 ```
 
@@ -79,19 +87,29 @@ Column {data-width=350}
 ### Value Boxes
 
 ```{r}
-valueBox(value = max(busdyn_subset()[,3:ncol(busdyn_subset)]),
-         subtitle = "maximum value of returned data")
+# Value Box showing average value of first metric graphed
+renderValueBox({
+valueBox(value = mean(busdyn_subset() %>% input$metric1),
+         subtitle = "average value") 
+  })
 
-valueBox(value = min(busdyn_subset()[,3:ncol(busdyn_subset)]),
-         subtitle = "minimum value of returned data")
+# Value Box showing average value of second metric graphed
+renderValueBox({
+valueBox(value = mean(busdyn_subset() %>% input$metric2),
+         subtitle = "average value")
+})
 
-valueBox(value = mean(busdyn_subset()[,3:ncol(busdyn_subset)]),
-         subtitle = "mean value of returned data")
+
 ```
 
-### Chart C
+### Data Table
 
 ```{r}
-
+# Data Table corresponding to scatterplot
+reactive({DT::datatable(busdyn_subset(), 
+          class = "cell-border stripe",
+          caption = "Table of user-subsetted data",
+          )
+})
 ```
 
