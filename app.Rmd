@@ -3,9 +3,9 @@ title: "Compare Business Dynamism Across the 50 States"
 output: 
   flexdashboard::flex_dashboard:
     theme: spacelab
-    orientation: rows
     source_code: embed
     vertical_layout: scroll
+    orientation: rows
 runtime: shiny
 ---
 
@@ -45,17 +45,18 @@ radioButtons("plot_type", "Choose plot type showing job reallocation across all 
              choices = c("Box plot", "Violin Plot"), selected = c("Box plot"))
 ```
 Outputs
-Column {data-width=650}
+
+Row {data-height=650, .tabset}
 -----------------------------------------------------------------------
+### Chart 1: Rate of Business Creation for Selected States/Years
 
-### Chart 1: Rate of Establishments
-
-```{r plots}
+```{r first plot}
 # Create subset of dataset based on user year and state inputs showing new estabs
 busdyn_subset <- reactive({
   req(input$state, input$year) #ensure user has chosen what to graph
   subset (busdyn, State == input$state & Year == input$year, select = c(State, Year, Rate_of_establishments_born_prev_year, Rate_of_jobs_created_from_opening_establishments_prev_year))
 })
+
 
 # Create histogram of data subset
 renderPlot({
@@ -69,6 +70,11 @@ ggplotly(ggplot(busdyn_subset(), aes(x = State, y = Rate_of_establishments_born_
          tooltip = c("x", "y")
 )
 })
+```
+
+### Chart 2: Rate of Business and Job Creation for Selected States/Years
+
+```{r second plot}
 
 # Create scatterplot of data subset
 renderPlot({
@@ -83,11 +89,17 @@ ggplotly(ggplot(busdyn_subset(), aes(x = Rate_of_establishments_born_prev_year,
          tooltip = c("x", "y")
 )
 })
+```
 
+Row {data-height=350}
+-----------------------------------------------------------------------
+### Chart 3: Overall Rate of Business Dynamism for all 50 States
+
+```{r third plot}
 #Create boxplot or histogram of all data
 renderPlot({
   if(input$plot_type == "Box Plot"){
-    ggplotly(ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
+    (ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
                geom_boxplot()+
                labs(y = "Rate of Job Reallocation Previous Year",
                     x =  "Year",
@@ -97,7 +109,7 @@ renderPlot({
           )}
     
   else {
-    ggplotly(ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
+    (ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
       geom_violin()+
       labs(y = "Rate of Job Reallocation Previous Year",
            x =  "Year",
@@ -108,10 +120,9 @@ renderPlot({
 })
 ```
 
-Column {data-width=350}
+Row {data-height=350}
 -----------------------------------------------------------------------
-
-### Value Boxes
+### Average Annual Rate of Business Creation
 
 ```{r valueboxmean}
 # Value Box showing average value of Rate_of_establishments_born_prev_year
@@ -120,6 +131,8 @@ valueBox(value = (mean(busdyn_subset()$Rate_of_establishments_born_prev_year)), 
 
 ```
 
+### Max. Annual Rate of Business Creation
+
 ```{r valueboxmax}
 # Value Box showing average value of second metric graphed
 renderValueBox({
@@ -127,6 +140,8 @@ valueBox(value = (max(busdyn_subset()$Rate_of_establishments_born_prev_year)), "
   })
 
 ```
+
+### Min. Annual Rate of Business Creation
 
 ```{r valueboxmin}
 renderValueBox({
@@ -138,13 +153,5 @@ valueBox(value = (min(busdyn_subset()$Rate_of_establishments_born_prev_year)), "
 
 ```{r datatable}
 # Data Table corresponding to scatterplot
-reactive({DT::datatable(busdyn_subset(), 
-          class = "cell-border stripe",
-          caption = "Table of user-subsetted data",
-          )
-})
-```
-
-```{r context="render"}
-plotOutput("weight_plot")
+renderDataTable(busdyn_subset())
 ```
