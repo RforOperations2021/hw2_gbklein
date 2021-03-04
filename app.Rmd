@@ -1,17 +1,17 @@
 ---
-title: "Explore Business Dynamism in the 50 States "
+title: "Compare Business Dynamism Across the 50 States"
 output: 
-  flexdashboard::flex_dashboard
+  flexdashboard::flex_dashboard:
     theme: spacelab
     orientation: rows
     source_code: embed
-    vertical_layout: fill
+    vertical_layout: scroll
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-library(flexdashboard)
 library(shiny)
+library(flexdashboard)
 library(ggplot2)
 library(DT)
 library(stringr)
@@ -28,57 +28,84 @@ gsub(x = names(busdyn), pattern = "_", replacement = " ")
 ```
 Inputs {.sidebar}
 -----------------------------------------------------------------------
-```{r setup, include=FALSE}
+```{r sidebar}
 # User selects which state(s) to graph------------------------------------------
-checkboxGroupInput("state", "State(s)", choices = c("State"),
-                  selected = 2018, inline = TRUE
+checkboxGroupInput("state", "State(s)", choices = unique(busdyn$State),
+                  selected = "Alabama", inline = TRUE
                   )
 
 # User selects which year(s) to graph-------------------------------------------
 sliderInput("year", "Year(s)",
-            min = min(busdyn$Year), max = max(busdyn$Year),
-            value = range(busdyn$Year)
+            min = (2004), max = (2018),
+            value = c(2004,2018), sep = ""
             )
 
-# User selects first metric to graph---------------------------------------------
-radioButtons("metric1", "First Metric", choices = colnames(busdyn[3:11]), selected = NULL)
-
-# User selects second metric to graph---------------------------------------------
-radioButtons("metric2", "Second Metric", choices = colnames(busdyn[3:11]), selected = NULL)
-
-# User can request a data table
+# User selects type of chart to plot---------------------------------------------
+radioButtons("plot_type", "Choose plot type showing job reallocation across all states", 
+             choices = c("Box plot", "Violin Plot"), selected = c("Box plot"))
 ```
 Outputs
 Column {data-width=650}
 -----------------------------------------------------------------------
 
-### Chart A
+### Chart 1: Rate of Establishments
 
-```{r}
-# Create subset of dataset based on user inputs
+```{r plots}
+# Create subset of dataset based on user year and state inputs showing new estabs
 busdyn_subset <- reactive({
-  req(input$state, input$year, input$metric) #ensure user has chosen what to graph
-  busdyn %>%
-      filter(
-      State == input$state,
-      Year == input$year) %>%
-    select(State, Year, input$metric1, input$metric2)
-    
+  req(input$state, input$year) #ensure user has chosen what to graph
+  subset (busdyn, State == input$state & Year == input$year, select = c(State, Year, Rate_of_establishments_born_prev_year, Rate_of_jobs_created_from_opening_establishments_prev_year))
+})
+
+# Create histogram of data subset
+renderPlot({
+ggplotly(ggplot(busdyn_subset(), aes(x = State, y = Rate_of_establishments_born_prev_year)) +
+  geom_bar(stat = "identity", width = .4) +
+  labs(y = "Rate of Establishments Born in the Previous Year",
+       x = "State",
+       title ="The Best Performing States on Business Creation (Subsetted Data)",
+       subtitle = "Share of all firms that are 1 year old or younger",
+       caption ="Source: U.S. Census Business Dynamics Statistics Survey"),
+         tooltip = c("x", "y")
+)
 })
 
 # Create scatterplot of data subset
 renderPlot({
-ggplotly(ggplot(busdyn_subset(), aes(x = input$metric1,
-                            y = input$metric2)) + 
+ggplotly(ggplot(busdyn_subset(), aes(x = Rate_of_establishments_born_prev_year,
+                            y = Rate_of_jobs_created_from_opening_establishments_prev_year)) + 
          geom_point(aes(col = State)) +
-         labs(y = input$metric2,
-              x = input$metric1,
-              title="The Best Performing States",
-              caption="Source: U.S. Census Business Dynamics Statistics Survey"),
-         tooltip=c("x", "y")
+         labs(y = "Rate of Jobs Created from New Establishments",
+              x = "Rate of Establishments Born Previous Year",
+              title = "The Best Performing States on Business Creation and Resultant Jobs (Subsetted Data)",
+              subtitle = "Share of all firms that are 1 year old or younger and share of jobs at these firms", 
+              caption = "Source: U.S. Census Business Dynamics Statistics Survey"),
+         tooltip = c("x", "y")
 )
 })
 
+#Create boxplot or histogram of all data
+renderPlot({
+  if(input$plot_type == "Box Plot"){
+    ggplotly(ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
+               geom_boxplot()+
+               labs(y = "Rate of Job Reallocation Previous Year",
+                    x =  "Year",
+                    title = "The Distribution of Job Reallocation Rates across the States, 2004-2018",
+                    subtitle = "Sum of jobs created and destroyed - measuring how quickly jobs more from shrinking to expanding firms",
+                    caption = "Source: U.S. Census Business Dynamics Statistics Survey")
+          )}
+    
+  else {
+    ggplotly(ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
+      geom_violin()+
+      labs(y = "Rate of Job Reallocation Previous Year",
+           x =  "Year",
+           title = "The Distribution of Job Reallocation Rates across the States, 2004-2018",
+           subtitle = "Sum of jobs created and destroyed - measuring how quickly jobs more from shrinking to expanding firms",
+           caption = "Source: U.S. Census Business Dynamics Statistics Survey"))
+}
+})
 ```
 
 Column {data-width=350}
@@ -86,25 +113,30 @@ Column {data-width=350}
 
 ### Value Boxes
 
-```{r}
-# Value Box showing average value of first metric graphed
+```{r valueboxmean}
+# Value Box showing average value of Rate_of_establishments_born_prev_year
 renderValueBox({
-valueBox(value = mean(busdyn_subset() %>% input$metric1),
-         subtitle = "average value") 
-  })
+valueBox(value = (mean(busdyn_subset()$Rate_of_establishments_born_prev_year)), "Average Annual Rate of Business Creation", icon = NULL)   })
 
+```
+
+```{r valueboxmax}
 # Value Box showing average value of second metric graphed
 renderValueBox({
-valueBox(value = mean(busdyn_subset() %>% input$metric2),
-         subtitle = "average value")
-})
+valueBox(value = (max(busdyn_subset()$Rate_of_establishments_born_prev_year)), "Max. Annual Rate of Business Creation", icon = NULL) 
+  })
 
+```
 
+```{r valueboxmin}
+renderValueBox({
+valueBox(value = (min(busdyn_subset()$Rate_of_establishments_born_prev_year)), "Min. Annual Rate of Business Creation", icon = NULL) 
+  })
 ```
 
 ### Data Table
 
-```{r}
+```{r datatable}
 # Data Table corresponding to scatterplot
 reactive({DT::datatable(busdyn_subset(), 
           class = "cell-border stripe",
@@ -113,3 +145,6 @@ reactive({DT::datatable(busdyn_subset(),
 })
 ```
 
+```{r context="render"}
+plotOutput("weight_plot")
+```
