@@ -30,128 +30,138 @@ Inputs {.sidebar}
 -----------------------------------------------------------------------
 ```{r sidebar}
 # User selects which state(s) to graph------------------------------------------
-checkboxGroupInput("state", "State(s)", choices = unique(busdyn$State),
-                  selected = "Alabama", inline = TRUE
+checkboxGroupInput("state", "State(s)", choices = unique(busdyn$State), inline = TRUE
                   )
 
-# User selects which year(s) to graph-------------------------------------------
+# User selects which year to graph-------------------------------------------
 sliderInput("year", "Year(s)",
             min = (2004), max = (2018),
-            value = c(2004,2018), sep = ""
+            value = c(2018), sep = ""
             )
 
-# User selects type of chart to plot---------------------------------------------
+# User selects type of plot for third visualization---------------------------------------------
 radioButtons("plot_type", "Choose plot type showing job reallocation across all states", 
              choices = c("Box plot", "Violin Plot"), selected = c("Box plot"))
 ```
 Outputs
 
+
+Row {data-height=175}
+-----------------------------------------------------------------------
+### Introduction
+
+This dashboard measures American business dynamism--a crucial input for job creation. All data is sourced from the U.S. Census Business Dynamics Statistics Survey.
+
+Chart 1 measures business creation rate, or the share of all firms that are 1 year old or younger. Chart 2 measures business creation rate against job creation rate from these new businesses, looking at where young companies are able to quickly grow in their first year. Chart 3 measures job reallocation rate, the sum of all jobs created and destroyed - looking at how quickly jobs move from shrinking to expanding firms.
+
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+### Average Annual Rate of Business Creation (selected data)
+
+```{r valueboxmeanbiz}
+# Value Box showing average value of Business Creation Rate
+renderValueBox({
+valueBox(color = "gold", value = round(mean(busdyn_subset()$Rate_of_establishments_born_prev_year), 1), "Average Annual Rate of Business Creation (selected data)", icon = NULL)   })
+
+```
+
+### Max. Annual Rate of Business Creation (selected data)
+
+```{r valueboxmeanjobs}
+# Value Box showing average value of Job Creation Rate
+renderValueBox({
+valueBox(color = "gold", value = round(mean(busdyn_subset()$Rate_of_jobs_created_from_opening_establishments_prev_year), 1), "Average Annual Rate of Job Creation at Young Firms (selected data)", icon = NULL) 
+  })
+
+```
+
+### Min. Annual Rate of Business Creation (selected data)
+
+```{r valueboxmeanreallocation}
+# Value Box showing average value of Job Reallocation Rate
+renderValueBox({
+valueBox(color = "gold", value = round(mean(busdyn_subset()$Rate_of_reallocation_prev_year, 1)), "Mean Annual Rate of Job Reallocation (selected data)", icon = NULL) 
+  })
+```
+
 Row {data-height=650, .tabset}
 -----------------------------------------------------------------------
-### Chart 1: Rate of Business Creation for Selected States/Years
+### Chart 1: Rate of Business Creation for Selected States & Year
 
 ```{r first plot}
-# Create subset of dataset based on user year and state inputs showing new estabs
+# Create subset of dataset based on user's year and state inputs 
 busdyn_subset <- reactive({
-  req(input$state, input$year) #ensure user has chosen what to graph
-  subset (busdyn, State == input$state & Year == input$year, select = c(State, Year, Rate_of_establishments_born_prev_year, Rate_of_jobs_created_from_opening_establishments_prev_year))
-})
+   if (length(input$state) > 0 ) { #select all states if user did not select any
+     subset (busdyn, State == input$state & Year == input$year, select = c(State, Year, Rate_of_establishments_born_prev_year, Rate_of_jobs_created_from_opening_establishments_prev_year, Rate_of_reallocation_prev_year))
+   }
+    else{subset (busdyn, Year == input$year, select = c(State, Year, Rate_of_establishments_born_prev_year, Rate_of_jobs_created_from_opening_establishments_prev_year, Rate_of_reallocation_prev_year))}
+  })
 
 
-# Create histogram of data subset
-renderPlot({
+# Create histogram of data subset for first visualization
+renderPlotly({
 ggplotly(ggplot(busdyn_subset(), aes(x = State, y = Rate_of_establishments_born_prev_year)) +
-  geom_bar(stat = "identity", width = .4) +
+           theme(axis.text.x=element_text(angle=60,hjust=1)) +
+         geom_bar(stat = "identity", width = .4, fill = "blue4") +
   labs(y = "Rate of Establishments Born in the Previous Year",
        x = "State",
-       title ="The Best Performing States on Business Creation (Subsetted Data)",
-       subtitle = "Share of all firms that are 1 year old or younger",
-       caption ="Source: U.S. Census Business Dynamics Statistics Survey"),
-         tooltip = c("x", "y")
-)
+       title ="Rate of Business and Job Creation for Selected States & Year",
+       subtitle = "Share of all firms that are 1 year old or younger"),
+         tooltip = c("x", "y"))
 })
 ```
 
-### Chart 2: Rate of Business and Job Creation for Selected States/Years
+### Chart 2: Rate of Business and Job Creation for Selected States & Year
 
 ```{r second plot}
 
-# Create scatterplot of data subset
-renderPlot({
+# Create scatterplot of data subset for second visualization
+renderPlotly({
 ggplotly(ggplot(busdyn_subset(), aes(x = Rate_of_establishments_born_prev_year,
-                            y = Rate_of_jobs_created_from_opening_establishments_prev_year)) + 
+                            y = Rate_of_jobs_created_from_opening_establishments_prev_year, text = State)) + 
          geom_point(aes(col = State)) +
          labs(y = "Rate of Jobs Created from New Establishments",
               x = "Rate of Establishments Born Previous Year",
-              title = "The Best Performing States on Business Creation and Resultant Jobs (Subsetted Data)",
-              subtitle = "Share of all firms that are 1 year old or younger and share of jobs at these firms", 
-              caption = "Source: U.S. Census Business Dynamics Statistics Survey"),
-         tooltip = c("x", "y")
+              title = "Rate of Business and Job Creation for Selected States & Year",
+              subtitle = "Share of all firms that are 1 year old or younger and share of jobs at these firms"),
+         tooltip = c("text", "x", "y") 
 )
 })
 ```
 
-Row {data-height=350}
------------------------------------------------------------------------
 ### Chart 3: Overall Rate of Business Dynamism for all 50 States
 
 ```{r third plot}
-#Create boxplot or histogram of all data
-renderPlot({
+# Create boxplot or violin plot of all data based on user's choice of plot
+renderPlotly({
   if(input$plot_type == "Box Plot"){
-    (ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
-               geom_boxplot()+
-               labs(y = "Rate of Job Reallocation Previous Year",
+    (ggplotly(ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
+               geom_violin()+
+               labs(y = "Annual Rate of Job Reallocation",
                     x =  "Year",
                     title = "The Distribution of Job Reallocation Rates across the States, 2004-2018",
                     subtitle = "Sum of jobs created and destroyed - measuring how quickly jobs more from shrinking to expanding firms",
                     caption = "Source: U.S. Census Business Dynamics Statistics Survey")
-          )}
+          ))}
     
   else {
-    (ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year)) +
-      geom_violin()+
-      labs(y = "Rate of Job Reallocation Previous Year",
+    (ggplotly(ggplot(busdyn, aes(x = Year, y = Rate_of_reallocation_prev_year, text = State)) +
+      geom_boxplot(fill = "blue4")+
+        scale_x_discrete(breaks=NULL) +
+      labs(y = "Annual Rate of Job Reallocation",
            x =  "Year",
            title = "The Distribution of Job Reallocation Rates across the States, 2004-2018",
-           subtitle = "Sum of jobs created and destroyed - measuring how quickly jobs more from shrinking to expanding firms",
-           caption = "Source: U.S. Census Business Dynamics Statistics Survey"))
+           subtitle = "Sum of jobs created and destroyed - measuring how quickly jobs more from shrinking to expanding firms"),
+      tooltip = "text"))
 }
 })
-```
-
-Row {data-height=350}
------------------------------------------------------------------------
-### Average Annual Rate of Business Creation
-
-```{r valueboxmean}
-# Value Box showing average value of Rate_of_establishments_born_prev_year
-renderValueBox({
-valueBox(value = (mean(busdyn_subset()$Rate_of_establishments_born_prev_year)), "Average Annual Rate of Business Creation", icon = NULL)   })
-
-```
-
-### Max. Annual Rate of Business Creation
-
-```{r valueboxmax}
-# Value Box showing average value of second metric graphed
-renderValueBox({
-valueBox(value = (max(busdyn_subset()$Rate_of_establishments_born_prev_year)), "Max. Annual Rate of Business Creation", icon = NULL) 
-  })
-
-```
-
-### Min. Annual Rate of Business Creation
-
-```{r valueboxmin}
-renderValueBox({
-valueBox(value = (min(busdyn_subset()$Rate_of_establishments_born_prev_year)), "Min. Annual Rate of Business Creation", icon = NULL) 
-  })
 ```
 
 ### Data Table
 
 ```{r datatable}
-# Data Table corresponding to scatterplot
-renderDataTable(busdyn_subset())
+# Create data table corresponding to selected data
+renderDataTable(busdyn_subset(), options = list(pageLength = 10, autoWidth = TRUE, columnDefs = list(list(width = "8px", targets = "all"()))), 
+                    rownames = FALSE)
 ```
